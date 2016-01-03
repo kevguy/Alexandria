@@ -4,6 +4,7 @@ import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
 import android.database.Cursor;
+import android.os.Build;
 import android.os.Bundle;
 import android.support.v4.app.Fragment;
 import android.support.v4.app.LoaderManager;
@@ -37,7 +38,7 @@ public class AddBook extends Fragment implements LoaderManager.LoaderCallbacks<C
     private String mScanFormat = "Format:";
     private String mScanContents = "Contents:";
 
-
+    private String mMessage;
 
     public AddBook(){
     }
@@ -102,6 +103,23 @@ public class AddBook extends Fragment implements LoaderManager.LoaderCallbacks<C
 
                 Toast toast = Toast.makeText(context, text, duration);
                 toast.show();
+
+                //mode = IMG_LEFT;
+                //isVideo = false;
+                /*if (Build.VERSION.SDK_INT <19){
+                    Intent intent = new Intent();
+                    //intent.setType("image*//*");
+                    //intent.setAction(Intent.ACTION_GET_CONTENT);
+                    startActivityForResult(Intent.createChooser(intent, "Select Picture"),GALLERY_INTENT_CALLED);
+                } else {
+                    Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+                    intent.addCategory(Intent.CATEGORY_OPENABLE);
+                    //intent.setType("image*//*");
+                    startActivityForResult(intent, GALLERY_KITKAT_INTENT_CALLED);
+                }*/
+
+                Intent intent = new Intent(getActivity(), BarcodeScanner.class);
+                startActivityForResult(intent, 1);
 
             }
         });
@@ -204,4 +222,24 @@ public class AddBook extends Fragment implements LoaderManager.LoaderCallbacks<C
         super.onAttach(activity);
         activity.setTitle(R.string.scan);
     }
+
+    @Override
+    public void onActivityResult(int requestCode, int resultCode, Intent data) {
+
+        if (requestCode == 1) {
+            if(resultCode == Activity.RESULT_OK){
+                String result=data.getStringExtra("result");
+                mMessage = result;
+
+                Context context = getActivity();
+                int duration = Toast.LENGTH_SHORT;
+
+                Toast toast = Toast.makeText(context, mMessage, duration);
+                toast.show();
+            }
+            if (resultCode == Activity.RESULT_CANCELED) {
+                //Write your code if there's no result
+            }
+        }
+    }//onActivityResult
 }
