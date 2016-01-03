@@ -3,9 +3,11 @@ package it.jaschke.alexandria;
 import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.database.Cursor;
 import android.os.Build;
 import android.os.Bundle;
+import android.preference.PreferenceManager;
 import android.support.v4.app.Fragment;
 import android.support.v4.app.LoaderManager;
 import android.support.v4.content.CursorLoader;
@@ -26,7 +28,7 @@ import it.jaschke.alexandria.services.BookService;
 import it.jaschke.alexandria.services.DownloadImage;
 
 
-public class AddBook extends Fragment implements LoaderManager.LoaderCallbacks<Cursor> {
+public class AddBook extends Fragment implements LoaderManager.LoaderCallbacks<Cursor>, SharedPreferences.OnSharedPreferenceChangeListener {
     private static final String TAG = "INTENT_TO_SCAN_ACTIVITY";
     private EditText ean;
     private final int LOADER_ID = 1;
@@ -200,6 +202,10 @@ public class AddBook extends Fragment implements LoaderManager.LoaderCallbacks<C
 
         rootView.findViewById(R.id.save_button).setVisibility(View.VISIBLE);
         rootView.findViewById(R.id.delete_button).setVisibility(View.VISIBLE);
+
+        rootView.findViewById(R.id.network_status_text).setVisibility(View.INVISIBLE);
+
+        //updateEmptyView();
     }
 
     @Override
@@ -243,4 +249,51 @@ public class AddBook extends Fragment implements LoaderManager.LoaderCallbacks<C
             }
         }
     }//onActivityResult
+
+    @Override
+    public void onResume(){
+        SharedPreferences sp = PreferenceManager.getDefaultSharedPreferences(getActivity());
+        sp.registerOnSharedPreferenceChangeListener(this);
+        super.onResume();
+    }
+
+    @Override
+    public void onPause() {
+        SharedPreferences sp = PreferenceManager.getDefaultSharedPreferences(getActivity());
+        sp.unregisterOnSharedPreferenceChangeListener(this);
+        super.onPause();
+    }
+
+    /*
+        Updates the empty list view with contextually relevant information that the user can
+        use to determine why they aren't seeing weather.
+     */
+    private void updateEmptyView() {
+        TextView tv = (TextView) getView().findViewById(R.id.network_status_text);
+        rootView.findViewById(R.id.network_status_text).setVisibility(View.VISIBLE);
+        if ( null != tv ) {
+            // if cursor is empty, why? do we have an invalid location
+            int message = R.string.add_book_no_network;
+            @BookService.NetworkStatus int network = Utility.getNetworkStatus(getActivity());
+            switch (network) {
+                case BookService.NETWORK_STATUS_DOWN:
+                    message = R.string.add_book_no_network;
+                    break;
+                case BookService.NETWORK_STATUS_OK:
+                    rootView.findViewById(R.id.network_status_text).setVisibility(View.INVISIBLE);
+                default:
+                    if (!Utility.isNetworkAvailable(getActivity()) ) {
+                        message = R.string.add_book_no_network;
+                    }
+            }
+            tv.setText(message);
+        }
+    }
+
+    @Override
+    public void onSharedPreferenceChanged(SharedPreferences sharedPreferences, String key) {
+        if ( key.equals(getString(R.string.pref_network_status_key)) ) {
+            updateEmptyView();
+        }
+    }
 }

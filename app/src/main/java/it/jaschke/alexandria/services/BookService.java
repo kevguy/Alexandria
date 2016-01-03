@@ -2,9 +2,13 @@ package it.jaschke.alexandria.services;
 
 import android.app.IntentService;
 import android.content.ContentValues;
+import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.database.Cursor;
 import android.net.Uri;
+import android.preference.PreferenceManager;
+import android.support.annotation.IntDef;
 import android.support.v4.content.LocalBroadcastManager;
 import android.util.Log;
 
@@ -16,6 +20,8 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
 import java.net.HttpURLConnection;
 import java.net.URL;
 
@@ -37,6 +43,13 @@ public class BookService extends IntentService {
     public static final String DELETE_BOOK = "it.jaschke.alexandria.services.action.DELETE_BOOK";
 
     public static final String EAN = "it.jaschke.alexandria.services.extra.EAN";
+
+    @Retention(RetentionPolicy.SOURCE)
+    @IntDef({NETWORK_STATUS_OK, NETWORK_STATUS_DOWN})
+    public @interface NetworkStatus{}
+
+    public static final int NETWORK_STATUS_OK = 0;
+    public static final int NETWORK_STATUS_DOWN = 1;
 
     public BookService() {
         super("Alexandria");
@@ -125,11 +138,15 @@ public class BookService extends IntentService {
             }
 
             if (buffer.length() == 0) {
+                // Stream was empty. No point in parsing
+                setNetworkStatus(getBaseContext(), NETWORK_STATUS_DOWN);
                 return;
             }
             bookJsonString = buffer.toString();
+            getBookDataFromJson(ean, bookJsonString);
         } catch (Exception e) {
             Log.e(LOG_TAG, "Error ", e);
+            setNetworkStatus(this, NETWORK_STATUS_DOWN);
         } finally {
             if (urlConnection != null) {
                 urlConnection.disconnect();
@@ -144,7 +161,7 @@ public class BookService extends IntentService {
 
         }
 
-        final String ITEMS = "items";
+        /*final String ITEMS = "items";
 
         final String VOLUME_INFO = "volumeInfo";
 
@@ -198,6 +215,68 @@ public class BookService extends IntentService {
 
         } catch (JSONException e) {
             Log.e(LOG_TAG, "Error ", e);
+        }*/
+    }
+
+    private void getBookDataFromJson(String ean, String bookJsonString){
+        final String ITEMS = "items";
+
+        final String VOLUME_INFO = "volumeInfo";
+
+        final String TITLE = "title";
+        final String SUBTITLE = "subtitle";
+        final String AUTHORS = "authors";
+        final String DESC = "description";
+        final String CATEGORIES = "categories";
+        final String IMG_URL_PATH = "imageLinks";
+        final String IMG_URL = "thumbnail";
+
+        try {
+            JSONObject bookJson = new JSONObject(bookJsonString);
+            JSONArray bookArray;
+            if(bookJson.has(ITEMS)){
+                bookArray = bookJson.getJSONArray(ITEMS);
+            }else{
+                Intent messageIntent = new Intent(MainActivity.MESSAGE_EVENT);
+                messageIntent.putExtra(MainActivity.MESSAGE_KEY,getResources().getString(R.string.not_found));
+                LocalBroadcastManager.getInstance(getApplicationContext()).sendBroadcast(messageIntent);
+                return;
+            }
+
+            JSONObject bookInfo = ((JSONObject) bookArray.get(0)).getJSONObject(VOLUME_INFO);
+
+            String title = bookInfo.getString(TITLE);
+
+            String subtitle = "";
+            if(bookInfo.has(SUBTITLE)) {
+                subtitle = bookInfo.getString(SUBTITLE);
+            }
+
+            String desc="";
+            if(bookInfo.has(DESC)){
+                desc = bookInfo.getString(DESC);
+            }
+
+            String imgUrl = "";
+            if(bookInfo.has(IMG_URL_PATH) && bookInfo.getJSONObject(IMG_URL_PATH).has(IMG_URL)) {
+                imgUrl = bookInfo.getJSONObject(IMG_URL_PATH).getString(IMG_URL);
+            }
+
+            writeBackBook(ean, title, subtitle, desc, imgUrl);
+
+            if(bookInfo.has(AUTHORS)) {
+                writeBackAuthors(ean, bookInfo.getJSONArray(AUTHORS));
+            }
+            if(bookInfo.has(CATEGORIES)){
+                writeBackCategories(ean,bookInfo.getJSONArray(CATEGORIES) );
+            }
+
+            setNetworkStatus(getBaseContext(),NETWORK_STATUS_OK);
+
+        } catch (JSONException e) {
+            Log.e(LOG_TAG, "Error ", e);
+            setNetworkStatus(getBaseContext(),NETWORK_STATUS_DOWN);
+
         }
     }
 
@@ -229,5 +308,18 @@ public class BookService extends IntentService {
             getContentResolver().insert(AlexandriaContract.CategoryEntry.CONTENT_URI, values);
             values= new ContentValues();
         }
+    }
+
+    /**
+     * Sets the network status into shared preference.  This function should not be called from
+     * the UI thread because it uses commit to write to the shared preferences.
+     * @param c Context to get the PreferenceManager from.
+     * @param networkStatus The IntDef value to set
+     */
+    static private void setNetworkStatus(Context c, @NetworkStatus int networkStatus){
+        SharedPreferences sp = PreferenceManager.getDefaultSharedPreferences(c);
+        SharedPreferences.Editor spe = sp.edit();
+        spe.putInt(c.getString(R.string.pref_network_status_key), networkStatus);
+        spe.commit();
     }
  }
