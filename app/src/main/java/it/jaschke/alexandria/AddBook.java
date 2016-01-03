@@ -230,6 +230,7 @@ public class AddBook extends Fragment implements LoaderManager.LoaderCallbacks<C
             if(resultCode == Activity.RESULT_OK){
                 String result=data.getStringExtra("result");
                 mMessage = result;
+                ean.setText(result);
 
                 Context context = getActivity();
                 int duration = Toast.LENGTH_SHORT;
