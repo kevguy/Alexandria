@@ -63,6 +63,7 @@ public class BarcodeScanner extends ActionBarActivity {
         mPreview = new CameraPreview(BarcodeScanner.this, mCamera, previewCb, autoFocusCB);
         FrameLayout preview =  (FrameLayout) findViewById(R.id.cameraPreview);
         preview.addView(mPreview);
+        /*
         scanButton = (Button) findViewById(R.id.ScanButton);
         scanButton.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -76,6 +77,7 @@ public class BarcodeScanner extends ActionBarActivity {
                 }
             }
         });
+        */
     }
 
     @Override
